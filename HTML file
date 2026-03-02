@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Clone - DMs & Bots</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-tertiary: #1e1f22; --bg-secondary: #2b2d31; --bg-primary: #313338;
+            --bg-hover: #393c43; --header-primary: #f2f3f5; --text-muted: #949ba4;
+            --text-normal: #dbdee1; --brand: #5865f2; --brand-hover: #4752c4;
+            --green: #23a559; --red: #da373c; --yellow: #f0b232; --channel-textarea: #383a40;
+        }
+        [data-theme="light"] {
+            --bg-tertiary: #e3e5e8; --bg-secondary: #f2f3f5; --bg-primary: #ffffff;
+            --bg-hover: #e4e5e7; --header-primary: #060607; --text-muted: #4e5058;
+            --text-normal: #2e3338; --channel-textarea: #ebedef;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-primary); color: var(--text-normal); height: 100vh; overflow: hidden; display: flex; }
+        .app { display: flex; width: 100%; height: 100%; }
+
+        /* --- SERVER LIST --- */
+        .server-list { width: 72px; background-color: var(--bg-tertiary); display: flex; flex-direction: column; align-items: center; padding-top: 12px; flex-shrink: 0; overflow-y: auto; }
+        .server-icon, .home-btn { width: 48px; height: 48px; background-color: var(--bg-primary); border-radius: 50%; display: flex; justify-content: center; align-items: center; margin-bottom: 8px; cursor: pointer; color: var(--header-primary); font-size: 18px; font-weight: 600; transition: 0.2s; position: relative; }
+        .server-icon:hover, .home-btn:hover { border-radius: 16px; background-color: var(--brand); color: white; }
+        .server-icon.active, .home-btn.active { border-radius: 16px; background-color: var(--brand); color: white; }
+        .server-icon.active::before, .home-btn.active::before { content: ''; position: absolute; left: -14px; width: 8px; background-color: white; border-radius: 0 4px 4px 0; top: 10px; bottom: 10px; }
+        .separator { width: 32px; height: 2px; background-color: #35363c; margin: 6px 0; border-radius: 1px; }
+
+        /* --- SIDEBAR --- */
+        .sidebar { width: 240px; background-color: var(--bg-secondary); display: flex; flex-direction: column; flex-shrink: 0; }
+        
+        /* Updated Header Flexbox to support the button */
+        .sidebar-header { 
+            height: 48px; 
+            padding: 0 16px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; /* Keeps title left, button right */
+            font-weight: 700; 
+            color: var(--header-primary); 
+            border-bottom: 1px solid rgba(0,0,0,0.2); 
+            cursor: pointer; 
+            flex-shrink: 0; 
+            transition: 0.1s; 
+        }
+        .sidebar-header:hover { background-color: var(--bg-hover); }
+        
+        /* The New Add Friend Button (Discord Style) */
+        .add-friend-btn {
+            background-color: var(--green);
+            color: white;
+            border: none;
+            border-radius: 3px; /* Discord uses slightly sharp corners on buttons */
+            padding: 2px 8px; /* Compact height */
+            height: 24px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: none; /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        .add-friend-btn:hover { background-color: #1a8f48; }
+
+        .channels { flex: 1; overflow-y: auto; padding: 8px; }
+        
+        /* DM Specific Styles */
+        .dm-item { display: flex; align-items: center; padding: 6px 8px; margin-bottom: 2px; border-radius: 4px; color: var(--text-muted); cursor: pointer; font-weight: 500; }
+        .dm-item:hover { background-color: var(--bg-hover); color: var(--header-primary); }
+        .dm-item.active { background-color: var(--bg-hover); color: white; }
+        .dm-avatar { width: 32px; height: 32px; border-radius: 50%; margin-right: 12px; background-color: var(--bg-primary); }
+
+        .channel-item { padding: 6px 8px; margin-bottom: 2px; border-radius: 4px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; font-weight: 500; }
+        .channel-item:hover { background-color: var(--bg-hover); color: var(--header-primary); }
+        .channel-item.active { background-color: var(--bg-hover); color: white; }
+        .category-label { font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); padding: 16px 8px 4px 8px; display: flex; justify-content: space-between; }
+        
+        /* --- USER PANEL --- */
+        .user-panel { height: 52px; background-color: #232428; padding: 0 8px; display: flex; align-items: center; flex-shrink: 0; }
+        .avatar-wrapper { width: 32px; height: 32px; border-radius: 50%; background-color: var(--brand); position: relative; cursor: pointer; }
+        .avatar-wrapper img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .user-info { flex: 1; margin-left: 8px; overflow: hidden; }
+        .username { font-size: 14px; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .usertag { font-size: 12px; color: var(--text-muted); }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #232428; position: absolute; bottom: -2px; right: -2px; }
+        .status-online { background-color: var(--green); }
+        .status-idle { background-color: var(--yellow); }
+        .status-offline { background-color: #80848e; }
+
+        /* --- CHAT AREA --- */
+        .chat-area { flex: 1; display: flex; flex-direction: column; background-color: var(--bg-primary); min-width: 0; }
+        .chat-header { height: 48px; padding: 0 16px; display: flex; align-items: center; border-bottom: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
+        .header-hash { font-size: 24px; color: var(--text-muted); margin-right: 8px; }
+        .header-title { font-weight: 700; color: var(--header-primary); }
+        .messages-wrapper { flex: 1; overflow-y: auto; padding: 16px; }
+        
+        .message-group { display: flex; margin-bottom: 16px; position: relative; padding: 4px; border-radius: 4px; }
+        .message-group:hover { background-color: rgba(0,0,0,0.04); }
+        .msg-avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 16px; cursor: pointer; flex-shrink: 0; }
+        .msg-header { display: flex; align-items: baseline; gap: 8px; }
+        .msg-username { font-weight: 500; cursor: pointer; }
+        .msg-username:hover { text-decoration: underline; }
+        .msg-timestamp { font-size: 11px; color: var(--text-muted); }
+        .msg-text { color: var(--text-normal); line-height: 1.4; font-size: 15px; margin-top: 4px; }
+        
+        /* Role Colors */
+        .role-owner { color: #f0b232; }
+        .role-admin { color: #e74c3c; }
+        .role-mod { color: #2ecc71; }
+        .role-bot { color: #5865f2; }
+
+        .input-area { padding: 0 16px 24px 16px; flex-shrink: 0; }
+        .input-wrapper { background-color: var(--channel-textarea); border-radius: 8px; display: flex; align-items: center; padding: 0 16px; }
+        .chat-input { background: transparent; border: none; color: var(--text-normal); flex: 1; padding: 12px 0; font-size: 16px; outline: none; }
+
+        /* --- MEMBER LIST --- */
+        .member-list { width: 240px; background-color: var(--bg-secondary); padding: 16px 8px; overflow-y: auto; flex-shrink: 0; border-left: 1px solid rgba(0,0,0,0.2); }
+        .member-category { font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); padding: 8px; margin-top: 8px; }
+        .member-item { display: flex; align-items: center; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .member-item:hover { background-color: var(--bg-hover); }
+        .member-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: 12px; }
+
+        /* --- MODALS --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background: var(--bg-primary); border-radius: 8px; box-shadow: 0 0 0 1px rgba(0,0,0,0.1); width: 800px; height: 600px; display: flex; flex-direction: row; overflow: hidden; }
+        .modal-close { position: absolute; top: 12px; right: 12px; color: var(--text-muted); cursor: pointer; font-size: 20px; z-index: 10; }
+        
+        .settings-nav { width: 220px; background-color: var(--bg-secondary); padding: 20px 0; flex-shrink: 0; display: flex; flex-direction: column; }
+        .settings-nav-item { padding: 10px 20px; cursor: pointer; color: var(--text-muted); font-weight: 600; border-radius: 4px; margin: 2px 8px; }
+        .settings-nav-item:hover, .settings-nav-item.active { background-color: var(--bg-hover); color: var(--header-primary); }
+        
+        .settings-content { flex: 1; padding: 40px; overflow-y: auto; position: relative; }
+        .settings-title { font-size: 20px; font-weight: 700; color: var(--header-primary); margin-bottom: 20px; }
+        
+        /* Role/Bot Editor */
+        .role-list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 4px; margin-bottom: 4px; cursor: pointer; border: 1px solid transparent; }
+        .role-list-item:hover { border-color: var(--text-muted); }
+        .role-circle { width: 14px; height: 14px; border-radius: 50%; margin-right: 10px; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; text-transform: uppercase; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; }
+        .form-input { width: 100%; padding: 10px; background: var(--bg-tertiary); border: none; border-radius: 4px; color: var(--text-normal); outline: none; }
+        .form-input:focus { border: 1px solid var(--brand); }
+        
+        .permission-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .perm-item { background: var(--bg-tertiary); padding: 12px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
+        .toggle-switch { width: 40px; height: 20px; background: #4f545c; border-radius: 10px; cursor: pointer; position: relative; transition: 0.2s; }
+        .toggle-switch.active { background: var(--brand); }
+        .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: 0.2s; }
+        .toggle-switch.active::after { left: 22px; }
+
+        /* User Popup */
+        .user-popup { position: fixed; width: 300px; background: var(--bg-primary); border-radius: 8px; box-shadow: 0 8px 16px rgba(0,0,0,0.5); z-index: 2000; display: none; overflow: hidden; border: 1px solid var(--bg-tertiary); }
+        .user-popup-banner { height: 60px; background-color: var(--brand); }
+        .user-popup-content { padding: 16px; padding-top: 0; text-align: center; }
+        .user-popup-avatar { width: 60px; height: 60px; border-radius: 50%; border: 4px solid var(--bg-primary); margin-top: -30px; }
+        .user-popup-name { font-size: 18px; font-weight: 700; margin-top: 8px; }
+        .user-popup-divider { height: 1px; background: rgba(0,0,0,0.1); margin: 12px 0; }
+        .user-popup-section-title { font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); text-align: left; margin-bottom: 8px; }
+        .mod-action { width: 100%; padding: 8px; margin-bottom: 4px; border-radius: 4px; border: none; cursor: pointer; font-weight: 600; font-size: 13px; }
+        .btn-friend { background-color: var(--green); color: white; }
+        .btn-message { background-color: var(--brand); color: white; }
+        .btn-ban { background-color: #ed4245; color: white; }
+        .btn-kick { background-color: #faa61a; color: white; }
+        .btn-primary { background-color: var(--brand); color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        .btn-primary:hover { background-color: var(--brand-hover); }
+        .btn-danger { background-color: transparent; color: var(--red); border: 1px solid var(--red); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;}
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <nav class="server-list" id="serverList">
+            <!-- DM Button (Home) -->
+            <div class="home-btn active" id="homeBtn" onclick="switchToHome()"><i class="fab fa-discord"></i></div>
+            <div class="separator"></div>
+            <div id="serverContainer"></div>
+            <div class="separator"></div>
+            <div class="server-icon" onclick="openCreateServerModal()"><i class="fas fa-plus"></i></div>
+        </nav>
+
+        <aside class="sidebar">
+            <!-- Updated Header Structure -->
+            <header class="sidebar-header" id="sidebarHeader">
+                <span id="headerTitle">Direct Messages</span>
+                <!-- The New Add Friend Button -->
+                <button id="addFriendBtn" class="add-friend-btn" onclick="promptAddFriend(event)">Add Friend</button>
+            </header>
+            <div class="channels" id="sidebarContent"></div>
+            <div class="user-panel">
+                <div class="avatar-wrapper">
+                    <img src="https://picsum.photos/seed/me/50/50" alt="User">
+                    <div class="status-dot status-online" id="myStatusDot"></div>
+                </div>
+                <div class="user-info">
+                    <div class="username" id="displayUsername">You</div>
+                    <div class="usertag">#1299</div>
+                </div>
+                <button onclick="toggleTheme()" style="background:none; border:none; color:var(--text-muted); margin-left:auto; cursor:pointer;"><i class="fas fa-cog"></i></button>
+            </div>
+        </aside>
+
+        <main class="chat-area">
+            <header class="chat-header">
+                <span class="header-hash" id="chatHash">#</span>
+                <span class="header-title" id="chatTitle">general</span>
+            </header>
+            <div class="messages-wrapper" id="mainContent"></div>
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <input type="text" class="chat-input" id="messageInput" placeholder="Message #general">
+                </div>
+            </div>
+        </main>
+
+        <aside class="member-list" id="memberList"></aside>
+    </div>
+
+    <!-- Create Server Modal -->
+    <div class="modal-overlay" id="createServerModal" onclick="if(event.target === this) closeModals()">
+        <div class="modal" style="flex-direction: column; align-items: center; text-align: center; justify-content: center; height: auto; width: 440px; padding: 24px; box-sizing: border-box;">
+            <h2 style="color:var(--header-primary); margin-bottom: 10px;">Create a Server</h2>
+            <p style="color:var(--text-muted); margin-bottom: 20px;">Enter a name for your server.</p>
+            <input type="text" id="newServerName" class="form-input" placeholder="My Server">
+            <div style="margin-top: 16px; display:flex; gap:10px; justify-content:flex-end; width: 100%;">
+                <button onclick="closeModals()" style="background:none; border:none; color:var(--text-normal); cursor:pointer;">Cancel</button>
+                <button class="btn-primary" onclick="confirmCreateServer()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal" onclick="if(event.target === this) closeModals()">
+        <div class="modal">
+            <div class="settings-nav" id="settingsNav"></div>
+            <div class="settings-content" id="settingsContent"></div>
+            <i class="fas fa-times modal-close" onclick="closeModals()"></i>
+        </div>
+    </div>
+
+    <!-- User Popup -->
+    <div class="user-popup" id="userPopup">
+        <div class="user-popup-banner"></div>
+        <div class="user-popup-content">
+            <img src="" class="user-popup-avatar" id="userPopupAvatar">
+            <div class="user-popup-name" id="userPopupName">Username</div>
+            <div class="user-popup-divider"></div>
+            <div id="userPopupRoles"></div>
+            <div id="modActions"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA & CONSTANTS ---
+        const nameBank = [
+            "Yoko", "Drake", "Diddy", "Myname", "Jeff", "Sarah", "Mike", "Liam", "Olivia", "Noah", 
+            "Emma", "hacker", "gamergirl", "xXDarkXx", "ProPlayer", "Cookie", "Biscuit", "Toast", 
+            "Coffee", "Midnight", "Shadow", "Ghost", "Kratos", "Mario", "Luigi", "Peach", "Zelda", 
+            "Link", "Bowser", "Sonic", "Tails", "Knuckles", "Goku", "Vegeta", "Gohan", "Naruto", 
+            "Sasuke", "Sakura", "Luffy", "Zoro", "Sanji", "Ichigo", "Rukia", "Renji", "Light", 
+            "L", "Misa", "Levi", "Mikasa", "Eren", "Armin", "Kirito", "Asuna", "Shinji", "Asuka"
+        ];
+
+        const conversations = [
+            { triggers: ["ez", "easy", "too easy"], responses: ["ok buddy calm down", "your toxic bud", "lol sure", "gg I guess", "bro thinks he's good"] },
+            { triggers: ["wanna play", "anyone wanna play", "game?", "up for a game"], responses: ["sure but one sec", "imma join", "let me finish this match first", "ill play but just wait i need to do something", "yeah invite me", "im down"] },
+            { triggers: ["hello", "hi", "yo", "hey"], responses: ["hey", "sup", "yo", "wassup", "ello mate", "hi!"] },
+            { triggers: ["lol", "lmao", "xd", "haha"], responses: ["funny?", "kek", "lol true", "lmaooo", "i know right", "haha"] },
+            { triggers: ["brb", "afk", "gtg"], responses: ["cya", "kk", "hurry back", "bye", "see ya"] },
+            { triggers: ["rip", "f", "sad"], responses: ["F", "press F to pay respects", "oof", "big oof", "gg go next"] },
+            { triggers: ["imma", "i'm gonna", "im going"], responses: ["do it", "don't", "lol sure", "go for it", "no wait"] },
+            { triggers: ["join", "invite"], responses: ["invited", "joined", "can i get invite?", "sure sent", "check dms"] },
+            { triggers: ["toxic", "trash", "bad"], responses: ["who?", "u?", "relax", "skill issue", "u mad?", "stay mad"] },
+            { triggers: ["owner", "OWNER", "created"], responses: ["YOOOOO OWNER", "OMG OWNER", "pls give special role", "OWNER!", "hi owner", "plzz give special role", "PLEASE GIVE COOL ROLE"] }
+        ];
+
+        const data = {
+            currentUser: { id: 'me', name: "You", tag: "#0001", status: "online", roles: [], avatar: 'me', friends: [] },
+            servers: [],
+            dms: {}, // { userId: [messages] }
+            activeServer: null,
+            activeChannel: null,
+            activeDm: null,
+            viewMode: 'home', // 'home', 'server', 'dm'
+            chatTimers: {}
+        };
+
+        // --- INIT ---
+        function init() {
+            createServer("Gaming Squad");
+            renderServers();
+            switchToHome();
+        }
+
+        // --- GENERATION LOGIC ---
+        function generateFakeUser() {
+            const name = nameBank[Math.floor(Math.random() * nameBank.length)];
+            const tag = `#${Math.floor(Math.random() * 9000) + 1000}`;
+            
+            return {
+                id: 'u-' + Math.random().toString(36).substr(2, 9),
+                name: name,
+                tag: tag,
+                avatar: Math.random().toString(36).substr(2, 9),
+                status: Math.random() > 0.3 ? (Math.random() > 0.5 ? 'online' : 'idle') : 'offline',
+                roles: [], 
+                banned: false,
+                timeoutUntil: null,
+                isBot: false
+            };
+        }
+
+        function createServer(name) {
+            const newServer = {
+                id: 's-' + Date.now(),
+                name: name,
+                icon: name[0],
+                owner: data.currentUser.id,
+                roles: [], 
+                bots: [], 
+                members: [],
+                channels: [
+                    { id: 'c-gen', name: 'general', type: 'text', messages: [] },
+                    { id: 'c-off-topic', name: 'off-topic', type: 'text', messages: [] }
+                ]
+            };
+
+            const count = Math.floor(Math.random() * 300) + 200;
+            newServer.members.push({...data.currentUser, roles: []}); 
+
+            for (let i = 0; i < count; i++) {
+                newServer.members.push(generateFakeUser());
+            }
+
+            data.servers.push(newServer);
+        }
+
+        // --- RENDERING ---
+        function renderServers() {
+            const container = document.getElementById('serverContainer');
+            container.innerHTML = '';
+            data.servers.forEach(s => {
+                const div = document.createElement('div');
+                div.className = `server-icon ${data.activeServer === s.id ? 'active' : ''}`;
+                div.textContent = s.icon;
+                div.onclick = () => switchServer(s.id);
+                container.appendChild(div);
+            });
+        }
+
+        function renderSidebar() {
+            const content = document.getElementById('sidebarContent');
+            content.innerHTML = '';
+            
+            // Header Elements
+            const headerTitle = document.getElementById('headerTitle');
+            const addBtn = document.getElementById('addFriendBtn');
+            const header = document.getElementById('sidebarHeader');
+
+            if (data.viewMode === 'home') {
+                headerTitle.innerText = "Friends";
+                // Disable header click to settings when on Friends page
+                header.onclick = null;
+                header.style.cursor = "default";
+                
+                // Show the Add Friend button!
+                addBtn.style.display = "flex";
+                
+                // Friends List
+                if (data.currentUser.friends.length === 0) {
+                    content.innerHTML = `<div style="padding: 10px; color: var(--text-muted); font-size: 12px; text-align: center;">Wumpus is waiting on friends. You don't have any yet!</div>`;
+                } else {
+                    data.currentUser.friends.forEach(fId => {
+                        const user = findUserById(fId);
+                        if (!user) return;
+                        
+                        const div = document.createElement('div');
+                        div.className = `dm-item ${data.activeDm === fId ? 'active' : ''}`;
+                        div.onclick = () => openDm(fId);
+                        div.innerHTML = `
+                            <img src="https://picsum.photos/seed/${user.avatar}/32/32" class="dm-avatar">
+                            <span>${user.name}</span>
+                        `;
+                        content.appendChild(div);
+                    });
+                }
+            } else {
+                // Server View
+                const server = data.servers.find(s => s.id === data.activeServer);
+                if (!server) return;
+                headerTitle.innerText = server.name;
+                // Enable header click for settings
+                header.onclick = handleHeaderClick;
+                header.style.cursor = "pointer";
+                
+                // Hide the Add Friend button in servers
+                addBtn.style.display = "none";
+                
+                const cat = document.createElement('div');
+                cat.className = 'category-label';
+                cat.innerHTML = `<span>TEXT CHANNELS</span><i class="fas fa-plus" style="cursor:pointer; opacity:0.5" onclick="addChannel()"></i>`;
+                content.appendChild(cat);
+
+                server.channels.filter(c => c.type === 'text').forEach(ch => {
+                    const div = document.createElement('div');
+                    div.className = `channel-item ${data.activeChannel === ch.id ? 'active' : ''}`;
+                    div.innerHTML = `<span class="header-hash" style="font-size:20px; margin-right:4px">#</span> ${ch.name}`;
+                    div.onclick = () => switchChannel(ch.id);
+                    content.appendChild(div);
+                });
+            }
+        }
+
+        function renderMembers() {
+            const list = document.getElementById('memberList');
+            list.innerHTML = '';
+
+            if (data.viewMode === 'home') {
+                list.innerHTML = `<div class="member-category">Friends — ${data.currentUser.friends.length}</div>`;
+                if (data.currentUser.friends.length === 0) {
+                     list.innerHTML += `<div style="padding:10px; color:var(--text-muted); font-size:12px;">Add friends to get started</div>`;
+                } else {
+                    data.currentUser.friends.forEach(fId => {
+                        const user = findUserById(fId);
+                        if(user) list.appendChild(createMemberItem(user, null));
+                    });
+                }
+                return;
+            }
+
+            const server = data.servers.find(s => s.id === data.activeServer);
+            if(!server) return;
+
+            const online = server.members.filter(m => m.status !== 'offline' && !m.banned);
+            const offline = server.members.filter(m => m.status === 'offline' && !m.banned);
+
+            const renderGroup = (title, members) => {
+                const cat = document.createElement('div');
+                cat.className = 'member-category';
+                cat.innerText = `${title} — ${members.length}`;
+                list.appendChild(cat);
+                members.forEach(m => list.appendChild(createMemberItem(m, server)));
+            };
+
+            renderGroup('Online', online);
+            renderGroup('Offline', offline);
+        }
+
+        function createMemberItem(user, server) {
+            let highestRole = null;
+            if (server && user.roles && user.roles.length > 0) {
+                highestRole = server.roles.find(r => user.roles.includes(r.id));
+            }
+            if (user.isBot) highestRole = { color: '#5865f2' }; 
+
+            const div = document.createElement('div');
+            div.className = 'member-item';
+            div.innerHTML = `
+                <div class="avatar-wrapper" style="width:32px; height:32px">
+                    <img src="https://picsum.photos/seed/${user.avatar}/32/32">
+                    <div class="status-dot status-${user.status}"></div>
+                </div>
+                <span class="member-name" style="color: ${highestRole ? highestRole.color : 'var(--text-normal)'}">${user.isBot ? `<span style="background:#5865f2; color:white; padding:1px 2px; border-radius:3px; font-size:10px; margin-right:4px;">BOT</span>` : ''}${user.name}</span>
+            `;
+            div.onclick = (e) => openUserPopup(e, user.id);
+            return div;
+        }
+
+        function findUserById(id) {
+            for (let s of data.servers) {
+                const u = s.members.find(m => m.id === id);
+                if (u) return u;
+            }
+            if (data.currentUser.id === id) return data.currentUser;
+            return null;
+        }
+
+        // --- NAVIGATION ---
+        function switchToHome() {
+            data.viewMode = 'home';
+            data.activeServer = null;
+            data.activeDm = null;
+            
+            document.getElementById('homeBtn').classList.add('active');
+            document.querySelectorAll('.server-icon').forEach(i => i.classList.remove('active'));
+            
+            document.getElementById('chatHash').innerText = '@';
+            document.getElementById('chatTitle').innerText = 'Friends';
+            document.getElementById('mainContent').innerHTML = `<div style="margin:auto; text-align:center; color:var(--text-muted)"><h2>Welcome to Direct Messages!</h2><p>Add friends using the button above to start chatting.</p></div>`;
+            document.getElementById('messageInput').placeholder = "Add a friend to message them.";
+            
+            renderSidebar();
+            renderMembers();
+        }
+
+        function switchServer(id) {
+            Object.values(data.chatTimers).forEach(clearInterval);
+            data.chatTimers = {};
+            
+            data.viewMode = 'server';
+            data.activeServer = id;
+            data.activeDm = null;
+            
+            document.getElementById('homeBtn').classList.remove('active');
+            
+            const server = data.servers.find(s => s.id === id);
+            if (!server) return;
+
+            renderServers();
+            renderSidebar();
+            switchChannel('c-gen');
+            renderMembers();
+            startChatSimulation(server);
+        }
+
+        function switchChannel(id) {
+            data.activeChannel = id;
+            renderSidebar();
+            renderChat();
+            const channel = data.servers.find(s => s.id === data.activeServer).channels.find(c => c.id === id);
+            document.getElementById('messageInput').placeholder = `Message #${channel.name}`;
+        }
+
+        function openDm(userId) {
+            data.viewMode = 'dm';
+            data.activeDm = userId;
+            data.activeServer = null;
+            document.getElementById('homeBtn').classList.add('active');
+            document.querySelectorAll('.server-icon').forEach(i => i.classList.remove('active'));
+            
+            renderSidebar();
+            renderDmChat();
+            renderMembers();
+        }
+
+        function renderChat() {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const channel = server.channels.find(c => c.id === data.activeChannel);
+            document.getElementById('chatHash').innerText = '#';
+            document.getElementById('chatTitle').innerText = channel.name;
+            
+            const container = document.getElementById('mainContent');
+            container.innerHTML = '';
+            
+            if (channel.messages.length === 0) {
+                container.innerHTML = `<div style="margin:auto; text-align:center; color:var(--text-muted)"><h2>Welcome to #${channel.name}!</h2><p>No messages yet.</p></div>`;
+            } else {
+                channel.messages.forEach(msg => appendMessage(msg, false, server));
+            }
+            scrollToBottom();
+        }
+
+        function renderDmChat() {
+            const user = findUserById(data.activeDm);
+            if (!user) return;
+
+            document.getElementById('chatHash').innerHTML = `<img src="https://picsum.photos/seed/${user.avatar}/32/32" style="width:32px; height:32px; border-radius:50%;">`;
+            document.getElementById('chatTitle').innerText = user.name;
+            document.getElementById('messageInput').placeholder = `Message @${user.name}`;
+
+            const messages = data.dms[data.activeDm] || [];
+            const container = document.getElementById('mainContent');
+            container.innerHTML = '';
+
+            if (messages.length === 0) {
+                container.innerHTML = `<div style="margin:auto; text-align:center; color:var(--text-muted)"><h2>This is the beginning of your direct message history with <strong>${user.name}</strong>.</h2></div>`;
+            } else {
+                messages.forEach(msg => appendMessage(msg, false, null, true)); 
+            }
+            scrollToBottom();
+        }
+
+        function appendMessage(msg, scroll = true, serverContext = null, isDm = false) {
+            const container = document.getElementById('mainContent');
+            const user = findUserById(msg.userId) || { name: 'System', avatar: 'x' };
+            
+            let color = 'var(--text-normal)';
+            if (isDm) {
+                color = msg.userId === data.currentUser.id ? 'var(--brand)' : 'var(--text-normal)';
+            } else if (serverContext) {
+                if (user.id === serverContext.owner) color = '#f0b232'; 
+                else if (user.isBot) color = '#5865f2';
+                else if (user.roles && user.roles.length > 0) {
+                    const role = serverContext.roles.find(r => user.roles.includes(r.id));
+                    if (role) color = role.color;
+                }
+            }
+
+            const div = document.createElement('div');
+            div.className = 'message-group';
+            div.innerHTML = `
+                <img src="https://picsum.photos/seed/${user.avatar}/40/40" class="msg-avatar" onclick="openUserPopup(event, '${user.id}')">
+                <div style="flex:1">
+                    <div class="msg-header">
+                        <span class="msg-username" style="color:${color}" onclick="openUserPopup(event, '${user.id}')">${user.isBot ? `<span style="background:#5865f2; color:white; padding:1px 2px; border-radius:3px; font-size:10px; margin-right:4px;">BOT</span>` : ''}${user.name}</span>
+                        <span class="msg-timestamp">${msg.time}</span>
+                    </div>
+                    <div class="msg-text">${msg.text}</div>
+                </div>
+            `;
+            container.appendChild(div);
+            if (scroll) scrollToBottom();
+        }
+
+        // --- CHAT SIMULATION (Server Only) ---
+        function startChatSimulation(server) {
+            const interval = setInterval(() => {
+                const channel = server.channels.find(c => c.id === data.activeChannel);
+                if (!channel || data.viewMode !== 'server') return;
+
+                if (Math.random() < 0.2) {
+                    generateBotMessage(server, channel, null);
+                }
+            }, 8000);
+
+            data.chatTimers[server.id] = interval;
+        }
+
+        function generateBotMessage(server, channel, triggerText) {
+            const candidates = server.members.filter(m => !m.isBot && m.id !== data.currentUser.id && m.status === 'online' && !m.banned);
+            if (candidates.length === 0) return;
+            
+            const user = candidates[Math.floor(Math.random() * candidates.length)];
+            let text = triggerText || slangGen();
+
+            const msg = { userId: user.id, text: text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+            channel.messages.push(msg);
+            
+            if (data.activeChannel === channel.id && data.viewMode === 'server') {
+                appendMessage(msg, true, server);
+            }
+
+            if (!triggerText) checkTriggers(text, server, channel);
+        }
+
+        function slangGen() {
+            const slang = ["fr fr", "no cap", "sheesh", "bruh moment", "imma head out", "that's wild", "bet", "say less", "facts", "anyone here?"];
+            return slang[Math.floor(Math.random() * slang.length)];
+        }
+
+        function checkTriggers(text, server, channel) {
+            const lower = text.toLowerCase();
+            conversations.forEach(conv => {
+                if (conv.triggers.some(t => lower.includes(t))) {
+                    if (Math.random() > 0.5) {
+                        const responderCount = Math.floor(Math.random() * 2) + 1;
+                        const candidates = server.members.filter(m => !m.isBot && m.id !== data.currentUser.id && m.status === 'online');
+                        for(let i=0; i<responderCount && i < candidates.length; i++) {
+                            const responder = candidates[Math.floor(Math.random() * candidates.length)];
+                            setTimeout(() => {
+                                const response = conv.responses[Math.floor(Math.random() * conv.responses.length)];
+                                const msg = { userId: responder.id, text: response, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+                                channel.messages.push(msg);
+                                if (data.activeChannel === channel.id && data.viewMode === 'server') appendMessage(msg, true, server);
+                            }, 1000 + (i*500));
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- USER INPUT HANDLING ---
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSend();
+        });
+
+        function handleSend() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            if (data.viewMode === 'dm') {
+                handleDmSend(text);
+            } else if (data.viewMode === 'server') {
+                handleServerSend(text);
+            }
+            input.value = '';
+        }
+
+        function handleServerSend(text) {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const channel = server.channels.find(c => c.id === data.activeChannel);
+            const msg = { userId: data.currentUser.id, text: text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+            
+            channel.messages.push(msg);
+            appendMessage(msg, true, server);
+
+            if (text.startsWith('/')) {
+                handleCommand(text, server, channel);
+            } else {
+                checkTriggers(text, server, channel);
+            }
+        }
+
+        function handleDmSend(text) {
+            const friendId = data.activeDm;
+            if (!data.dms[friendId]) data.dms[friendId] = [];
+
+            const msg = { userId: data.currentUser.id, text: text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+            data.dms[friendId].push(msg);
+            appendMessage(msg, true, null, true);
+
+            handleFriendReply(friendId, text);
+        }
+
+        function handleFriendReply(friendId, text) {
+            const lower = text.toLowerCase();
+            let reply = "";
+            
+            if (lower.includes("hello") || lower.includes("yoo")) reply = "whats good";
+            else if (lower.includes("wanna play a game") || lower.includes("wanna play")) reply = "bet";
+            else if (lower.includes("what game")) reply = "Roblox";
+            else reply = "mhm";
+
+            setTimeout(() => {
+                const msg = { userId: friendId, text: reply, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+                data.dms[friendId].push(msg);
+                if (data.activeDm === friendId) appendMessage(msg, true, null, true);
+            }, 1500);
+        }
+
+        // --- BOT & COMMANDS ---
+        function handleCommand(text, server, channel) {
+            const parts = text.split(' ');
+            const cmd = parts[0];
+            const args = parts.slice(1).join(' ');
+
+            if (cmd === '/verify') {
+                if (server.bots.length === 0) {
+                    const msg = { userId: 'system', text: "No bots in this server to verify you. Create one in Settings!", time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+                    channel.messages.push(msg);
+                    appendMessage(msg, true, server);
+                    return;
+                }
+
+                const bot = server.members.find(m => m.id === server.bots[0].id);
+                if (bot) {
+                    const replyMsg = { userId: bot.id, text: `Verifying @${data.currentUser.id}... Only you can see this`, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+                    channel.messages.push(replyMsg);
+                    appendMessage(replyMsg, true, server);
+
+                    if (!data.dms[bot.id]) data.dms[bot.id] = [];
+                    const dmMsg = { userId: bot.id, text: `You have been verified in **${server.name}**.`, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+                    data.dms[bot.id].push(dmMsg);
+                    
+                    if (!data.currentUser.friends.includes(bot.id)) data.currentUser.friends.push(bot.id);
+
+                    alert(`${bot.name} has sent you a DM regarding verification! Check your DMs.`);
+                    renderSidebar();
+                }
+            }
+        }
+
+        // --- PERMISSION & POPUP LOGIC ---
+        function hasPermission(userId, permissionKey) {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            if (!server) return false;
+            if (server.owner === userId) return true; 
+
+            const member = server.members.find(m => m.id === userId);
+            if (!member || !member.roles) return false;
+
+            return member.roles.some(roleId => {
+                const role = server.roles.find(r => r.id === roleId);
+                return role && role.permissions && role.permissions[permissionKey];
+            });
+        }
+
+        function openUserPopup(e, userId) {
+            e.stopPropagation();
+            const user = findUserById(userId);
+            if (!user) return;
+            if (user.id === data.currentUser.id) return;
+
+            const popup = document.getElementById('userPopup');
+            const rect = e.target.getBoundingClientRect();
+            
+            const popupHeight = 300; 
+            let top = rect.bottom + 10;
+            
+            if (rect.bottom + popupHeight > window.innerHeight) {
+                top = rect.top - popupHeight - 10;
+            }
+
+            let left = rect.left + 40;
+            if (left + 300 > window.innerWidth) {
+                left = rect.left - 300;
+            }
+
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+            popup.style.display = 'block';
+
+            document.getElementById('userPopupAvatar').src = `https://picsum.photos/seed/${user.avatar}/100/100`;
+            document.getElementById('userPopupName').innerText = user.name;
+            
+            const rolesDiv = document.getElementById('userPopupRoles');
+            rolesDiv.innerHTML = `<div class="user-popup-section-title">Actions</div>`;
+
+            const modDiv = document.getElementById('modActions');
+            modDiv.innerHTML = '';
+
+            const isFriend = data.currentUser.friends.includes(user.id);
+
+            if (!isFriend) {
+                const addBtn = document.createElement('button');
+                addBtn.className = 'mod-action btn-friend';
+                addBtn.innerText = 'Add Friend';
+                addBtn.onclick = () => addFriend(user.id);
+                modDiv.appendChild(addBtn);
+            } else {
+                const msgBtn = document.createElement('button');
+                msgBtn.className = 'mod-action btn-message';
+                msgBtn.innerText = 'Message';
+                msgBtn.onclick = () => { closeUserPopup(); openDm(user.id); };
+                modDiv.appendChild(msgBtn);
+            }
+
+            if (data.viewMode === 'server') {
+                const server = data.servers.find(s => s.id === data.activeServer);
+                const canBan = hasPermission(data.currentUser.id, 'ban');
+                const canKick = hasPermission(data.currentUser.id, 'kick');
+                const canManage = (canBan || canKick) && user.id !== data.currentUser.id && user.id !== server.owner && !user.isBot;
+
+                if (canManage) {
+                    modDiv.innerHTML += `<div class="user-popup-divider"></div><div class="user-popup-section-title">Moderation</div>`;
+                    
+                    if (canKick) {
+                        const kickBtn = document.createElement('button');
+                        kickBtn.className = 'mod-action btn-kick';
+                        kickBtn.innerText = 'Kick User';
+                        kickBtn.onclick = () => kickUser(user.id);
+                        modDiv.appendChild(kickBtn);
+                    }
+                    if (canBan) {
+                        const banBtn = document.createElement('button');
+                        banBtn.className = 'mod-action btn-ban';
+                        banBtn.innerText = 'Ban User';
+                        banBtn.onclick = () => banUser(user.id);
+                        modDiv.appendChild(banBtn);
+                    }
+                }
+            }
+
+            setTimeout(() => { document.addEventListener('click', closeUserPopup, { once: true }); }, 10);
+        }
+
+        function closeUserPopup() { document.getElementById('userPopup').style.display = 'none'; }
+
+        function addFriend(userId) {
+            if (data.currentUser.friends.includes(userId)) {
+                alert("You are already friends with this user!");
+                closeUserPopup();
+                return;
+            }
+
+            data.currentUser.friends.push(userId);
+            alert("Friend added! Check your DM list.");
+            closeUserPopup();
+            renderSidebar();
+            renderMembers();
+        }
+
+        // --- NEW ADD FRIEND BUTTON LOGIC ---
+        function promptAddFriend(e) {
+            e.stopPropagation(); // Prevent header click
+            const name = prompt("Enter a username to add as a friend:");
+            if (name) {
+                // Create a fake user for the new friend
+                const newUser = {
+                    id: 'u-' + Date.now(),
+                    name: name,
+                    tag: "#" + Math.floor(1000 + Math.random() * 9000),
+                    avatar: name, // use name as seed for image
+                    status: 'online',
+                    roles: [],
+                    banned: false,
+                    isBot: false
+                };
+
+                // Add them to the current user's friends list
+                data.currentUser.friends.push(newUser.id);
+
+                // Add them to a server so they "exist" in the world
+                if (data.servers.length > 0) {
+                    data.servers[0].members.push(newUser);
+                }
+
+                alert(`Added ${name} to your friends list!`);
+                renderSidebar();
+                renderMembers();
+            }
+        }
+
+        function banUser(uid) {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const user = server.members.find(m => m.id === uid);
+            if (user) {
+                user.banned = true;
+                user.status = 'offline';
+                closeUserPopup();
+                renderMembers();
+                alert(`${user.name} has been banned.`);
+            }
+        }
+
+        function kickUser(uid) {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const idx = server.members.findIndex(m => m.id === uid);
+            if (idx > -1) {
+                const name = server.members[idx].name;
+                server.members.splice(idx, 1); 
+                closeUserPopup();
+                renderMembers();
+                alert(`${name} has been kicked.`);
+            }
+        }
+
+        // --- SETTINGS MODAL ---
+        function handleHeaderClick() {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            if (server) openSettings();
+        }
+
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'flex';
+            renderSettingsNav();
+            renderSettingsGeneral();
+        }
+
+        function renderSettingsNav() {
+            const nav = document.getElementById('settingsNav');
+            nav.innerHTML = '';
+            const items = ['General', 'Roles', 'Bots', 'Members'];
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'settings-nav-item';
+                div.innerText = item;
+                div.onclick = () => {
+                    if (item === 'General') renderSettingsGeneral();
+                    else if (item === 'Roles') renderSettingsRoles();
+                    else if (item === 'Bots') renderSettingsBots();
+                    else if (item === 'Members') renderSettingsMembers();
+                };
+                nav.appendChild(div);
+            });
+        }
+
+        function renderSettingsGeneral() {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const content = document.getElementById('settingsContent');
+            content.innerHTML = `
+                <div class="settings-title">Server Overview</div>
+                <div class="form-group">
+                    <label class="form-label">Server Name</label>
+                    <input type="text" class="form-input" id="editServerName" value="${server.name}">
+                </div>
+                <button class="btn-primary" onclick="saveGeneral()">Save Changes</button>
+            `;
+        }
+
+        function saveGeneral() {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            server.name = document.getElementById('editServerName').value;
+            server.icon = server.name[0];
+            renderSidebar();
+            renderServers();
+        }
+
+        // --- BOTS SYSTEM ---
+        function renderSettingsBots() {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const content = document.getElementById('settingsContent');
+            content.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <div class="settings-title" style="margin:0">Server Bots</div>
+                    <button class="btn-primary" onclick="createBot()">Create Bot</button>
+                </div>
+                <p style="color:var(--text-muted); margin-bottom:10px;">Bots can respond to commands like <b>/verify</b>.</p>
+                <div id="botsList"></div>
+            `;
+            
+            const list = document.getElementById('botsList');
+            if (server.bots.length === 0) {
+                list.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:20px;">No bots created.</div>`;
+            } else {
+                server.bots.forEach(b => {
+                    const div = document.createElement('div');
+                    div.className = 'role-list-item';
+                    div.innerHTML = `
+                        <div style="display:flex; align-items:center;">
+                            <div class="role-circle" style="background-color:#5865f2"></div>
+                            <span style="font-weight:600;">${b.name}</span>
+                        </div>
+                        <button class="btn-danger" onclick="deleteBot('${b.id}')">Delete</button>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+        }
+
+        function createBot() {
+            const name = prompt("Enter a name for your bot:");
+            if (!name) return;
+
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const botId = 'bot-' + Date.now();
+            
+            const botUser = {
+                id: botId,
+                name: name,
+                tag: "#0000",
+                avatar: Math.random().toString(36).substr(2, 9),
+                status: 'online',
+                roles: [],
+                isBot: true
+            };
+
+            server.members.push(botUser);
+            server.bots.push({ id: botId, name: name });
+            renderSettingsBots();
+            renderMembers();
+        }
+
+        function deleteBot(id) {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            server.bots = server.bots.filter(b => b.id !== id);
+            server.members = server.members.filter(m => m.id !== id);
+            renderSettingsBots();
+            renderMembers();
+        }
+
+        // --- ROLES SYSTEM ---
+        function renderSettingsRoles() {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const content = document.getElementById('settingsContent');
+            content.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <div class="settings-title" style="margin:0">Roles</div>
+                    <button class="btn-primary" onclick="createRole()">Add Role</button>
+                </div>
+                <div id="rolesList"></div>
+            `;
+            
+            const list = document.getElementById('rolesList');
+            if (server.roles.length === 0) {
+                list.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:20px;">No roles yet.</div>`;
+            } else {
+                server.roles.forEach(r => {
+                    const div = document.createElement('div');
+                    div.className = 'role-list-item';
+                    div.innerHTML = `
+                        <div style="display:flex; align-items:center;">
+                            <div class="role-circle" style="background-color:${r.color}"></div>
+                            <span style="font-weight:600; color:${r.color}">${r.name}</span>
+                        </div>
+                        <button class="btn-primary" style="padding:4px 8px; font-size:12px;" onclick="editRole('${r.id}')">Edit</button>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+        }
+
+        function createRole() {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const newRole = { id: 'r-' + Date.now(), name: 'New Role', color: '#99aab5', permissions: { admin: false, ban: false, kick: false } };
+            server.roles.push(newRole);
+            renderSettingsRoles();
+            editRole(newRole.id);
+        }
+
+        function editRole(roleId) {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const role = server.roles.find(r => r.id === roleId);
+            const content = document.getElementById('settingsContent');
+            content.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+                    <i class="fas fa-arrow-left" style="cursor:pointer; color:var(--text-muted);" onclick="renderSettingsRoles()"></i>
+                    <div class="settings-title" style="margin:0">Edit Role</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Role Name</label>
+                    <input type="text" class="form-input" id="roleName" value="${role.name}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Role Color</label>
+                    <input type="color" id="roleColor" value="${role.color}" style="width:100%; height:40px; border:none; cursor:pointer;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Permissions</label>
+                    <div class="permission-grid">
+                        <div class="perm-item"><span>Administrator</span><div class="toggle-switch ${role.permissions.admin ? 'active' : ''}" onclick="this.classList.toggle('active')" id="permAdmin"></div></div>
+                        <div class="perm-item"><span>Ban Members</span><div class="toggle-switch ${role.permissions.ban ? 'active' : ''}" onclick="this.classList.toggle('active')" id="permBan"></div></div>
+                        <div class="perm-item"><span>Kick Members</span><div class="toggle-switch ${role.permissions.kick ? 'active' : ''}" onclick="this.classList.toggle('active')" id="permKick"></div></div>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:30px;">
+                    <button class="btn-danger" onclick="deleteRole('${role.id}')">Delete Role</button>
+                    <button class="btn-primary" onclick="saveRole('${role.id}')">Save</button>
+                </div>
+            `;
+        }
+
+        function saveRole(roleId) {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const role = server.roles.find(r => r.id === roleId);
+            role.name = document.getElementById('roleName').value;
+            role.color = document.getElementById('roleColor').value;
+            role.permissions.admin = document.getElementById('permAdmin').classList.contains('active');
+            role.permissions.ban = document.getElementById('permBan').classList.contains('active');
+            role.permissions.kick = document.getElementById('permKick').classList.contains('active');
+            if (role.permissions.admin) { role.permissions.ban = true; role.permissions.kick = true; }
+            renderSettingsRoles();
+        }
+
+        function deleteRole(roleId) {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            server.roles = server.roles.filter(r => r.id !== roleId);
+            server.members.forEach(m => { m.roles = m.roles.filter(rId => rId !== roleId); });
+            renderSettingsRoles();
+        }
+
+        // --- MEMBERS SYSTEM ---
+        function renderSettingsMembers() {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const content = document.getElementById('settingsContent');
+            content.innerHTML = `<div class="settings-title">Members</div>`;
+            const list = document.createElement('div');
+            list.style.marginTop = "20px";
+            
+            server.members.slice(0, 30).forEach(m => {
+                const div = document.createElement('div');
+                div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:10px; background:var(--bg-tertiary); border-radius:4px;';
+                let roleOptions = '<option value="">No Role</option>';
+                server.roles.forEach(r => { roleOptions += `<option value="${r.id}" ${m.roles.includes(r.id) ? 'selected' : ''}>${r.name}</option>`; });
+                div.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img src="https://picsum.photos/seed/${m.avatar}/32/32" style="border-radius:50%;">
+                        <span style="font-weight:600;">${m.isBot ? '<span style="color:#5865f2">[BOT]</span> ' : ''}${m.name}</span>
+                    </div>
+                    ${m.isBot ? '' : `<select class="form-input" style="width:auto; padding:5px; font-size:12px;" onchange="assignRole('${m.id}', this.value)">${roleOptions}</select>`}
+                `;
+                list.appendChild(div);
+            });
+            content.appendChild(list);
+        }
+
+        function assignRole(userId, roleId) {
+            const server = data.servers.find(s => s.id === data.activeServer);
+            const member = server.members.find(m => m.id === userId);
+            if (!member) return;
+            member.roles = roleId === "" ? [] : [roleId];
+            if (userId === data.currentUser.id) data.currentUser.roles = member.roles;
+            renderMembers();
+        }
+
+        function openCreateServerModal() { document.getElementById('createServerModal').style.display = 'flex'; }
+        
+        function confirmCreateServer() {
+            const name = document.getElementById('newServerName').value;
+            if(!name) return;
+            createServer(name);
+            closeModals();
+            renderServers();
+            switchServer(data.servers[data.servers.length-1].id);
+        }
+
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none'); }
+        function scrollToBottom() { document.getElementById('mainContent').scrollTop = document.getElementById('mainContent').scrollHeight; }
+        function toggleTheme() { document.body.toggleAttribute('data-theme'); }
+        function addChannel() {
+            const name = prompt("Enter channel name");
+            if(name) {
+                const server = data.servers.find(s => s.id === data.activeServer);
+                server.channels.push({ id: 'c-'+Date.now(), name: name.toLowerCase().replace(' ', '-'), type: 'text', messages: [] });
+                renderSidebar();
+            }
+        }
+        
+        init();
+    </script>
+</body>
+</html>
